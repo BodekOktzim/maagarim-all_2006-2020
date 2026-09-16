@@ -15,15 +15,21 @@
     "generate-data": "tsx scripts/generate-data.ts",
     "import-data": "tsx scripts/import-data.ts",
     "benchmark": "tsx scripts/benchmark.ts",
-    "test": "npm run test --workspaces --if-present",
-    "typecheck": "tsc -b --pretty"
+    "test": "tsx --test $(find packages apps -name '*.test.ts' -o -name '*.test.tsx')",
+    "typecheck": "tsc -p tsconfig.check.json --pretty"
   },
   "devDependencies": {
-    "typescript": "^5.5.0",
+    "@types/node": "^22.20.3",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
     "tsx": "^4.16.0",
-    "@types/node": "^20.14.0"
+    "typescript": "^5.5.0"
   },
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   }
 }
