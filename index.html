@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Synthetic Data Lab — Demo</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --border: #2a2f3a; --text: #e6e8ec; --muted: #9aa3af;
+    --accent: #6366f1; --self: #f59e0b; --sibling: #10b981; --danger: #ef4444; --ok: #22c55e;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif; }
+  header { padding:20px 24px; border-bottom:1px solid var(--border); }
+  header h1 { margin:0 0 4px; font-size:20px; }
+  header p { margin:0; color:var(--muted); font-size:13px; }
+  .warn { background:#3a2a12; border:1px solid #6b4a12; color:#fbbf24; padding:8px 12px; border-radius:8px; font-size:12px; margin-top:10px; }
+  main { max-width:1100px; margin:0 auto; padding:20px; display:grid; gap:20px; grid-template-columns: 340px 1fr; }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+  .panel { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:16px; }
+  .panel h2 { font-size:14px; margin:0 0 12px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+  label { display:block; font-size:12px; color:var(--muted); margin:10px 0 4px; }
+  input, select { width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); background:#0d0f13; color:var(--text); font-size:14px; }
+  button { cursor:pointer; border:none; border-radius:8px; padding:9px 14px; font-size:14px; font-weight:600; background:var(--accent); color:white; margin-top:12px; width:100%; }
+  button.secondary { background:#252a35; }
+  .stat-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-top:8px; }
+  .stat { background:#0d0f13; border:1px solid var(--border); border-radius:8px; padding:10px; text-align:center; }
+  .stat b { display:block; font-size:20px; }
+  .stat span { font-size:11px; color:var(--muted); }
+  .result-item { padding:10px; border:1px solid var(--border); border-radius:8px; margin-bottom:8px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; }
+  .result-item:hover { border-color:var(--accent); }
+  .badge { font-size:11px; padding:2px 8px; border-radius:999px; background:#252a35; color:var(--muted); }
+  .badge.high { background:#123; color:var(--ok); }
+  .badge.conflict { background:#3a1212; color:var(--danger); }
+  dl { display:grid; grid-template-columns:120px 1fr; gap:6px 10px; margin:0; font-size:14px; }
+  dt { color:var(--muted); }
+  svg { width:100%; height:auto; background:#0d0f13; border-radius:8px; border:1px solid var(--border); }
+  .tabs { display:flex; gap:6px; margin-bottom:14px; }
+  .tabs button { width:auto; margin:0; background:#252a35; }
+  .tabs button.active { background:var(--accent); }
+  .hidden { display:none; }
+  code { background:#0d0f13; padding:1px 6px; border-radius:4px; }
+  footer { text-align:center; color:var(--muted); font-size:12px; padding:24px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🧬 Synthetic Data Lab — Demo</h1>
+  <p>חיפוש מאוחד, Entity Resolution ו-Family Graph על נתונים סינתטיים בלבד — הכל רץ בדפדפן, ללא שרת.</p>
+  <div class="warn">⚠️ כל הנתונים בדף הזה נוצרים אקראית ברגע הלחיצה על "Generate". אין כאן מידע אמיתי על אף אדם, אין scraping, אין חיבור לשירות חיצוני כלשהו.</div>
+</header>
+
+<main>
+  <div class="panel">
+    <h2>1. Generate Synthetic Dataset</h2>
+    <label>Number of families</label>
+    <input id="familyCount" type="number" value="40" min="1" max="2000">
+    <label>Seed (לשחזוריות)</label>
+    <input id="seed" type="number" value="42">
+    <button id="generateBtn">Generate</button>
+
+    <div class="stat-grid" id="stats"></div>
+
+    <h2 style="margin-top:20px">2. Search</h2>
+    <label>Query</label>
+    <input id="searchQuery" placeholder="P00000101 / 050-000-1234 / Yossi Cohen">
+    <label>Type</label>
+    <select id="searchType">
+      <option value="auto">Auto-detect</option>
+      <option value="id">ID</option>
+      <option value="phone">Phone</option>
+      <option value="name">Name (fuzzy)</option>
+    </select>
+    <button id="searchBtn" class="secondary">Search</button>
+
+    <h2 style="margin-top:20px">3. Entity Resolution Demo</h2>
+    <p style="font-size:12px;color:var(--muted);margin:0 0 8px">משווה שתי רשומות סינתטיות שנוצרו בכוונה עם טעות כתיב וקונפליקט טלפון.</p>
+    <button id="erDemoBtn" class="secondary">Run Entity Resolution Example</button>
+  </div>
+
+  <div class="panel">
+    <div class="tabs">
+      <button data-tab="results" class="active">Results</button>
+      <button data-tab="profile">Person Profile</button>
+      <button data-tab="er">Entity Resolution</button>
+    </div>
+
+    <div id="tab-results">
+      <h2>Search Results</h2>
+      <div id="resultsList"><p style="color:var(--muted)">לחץ Generate ואז חפש מישהו.</p></div>
+    </div>
+
+    <div id="tab-profile" class="hidden">
+      <h2>Person Profile</h2>
+      <div id="profileContent"><p style="color:var(--muted)">בחר תוצאה מהחיפוש.</p></div>
+      <div id="graphContainer" style="margin-top:16px"></div>
+    </div>
+
+    <div id="tab-er" class="hidden">
+      <h2>Entity Resolution Result</h2>
+      <div id="erContent"><p style="color:var(--muted)">לחץ "Run Entity Resolution Example".</p></div>
+    </div>
+  </div>
+</main>
+
+<footer>Synthetic Data Lab demo · client-side only · <code>Math.random</code>-seeded generator, no backend, no external calls</footer>
+
+<script>
+/* ============================================================
+   Deterministic PRNG (mulberry32) — same algorithm used in the
+   full project's SyntheticDataGenerator (packages/synthetic-generator).
+   ============================================================ */
+function mulberry32(seed) {
+  let a = seed;
+  return function () {
+    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const FIRST_NAMES = ["Yossi","Moshe","Gabi","Avi","Dana","Ronit","Michal","Tal","David","Noa","Eitan","Maya"];
+const LAST_NAMES  = ["Cohen","Levi","Mizrahi","Peretz","Demo","Azulay","Bar"];
+const CITIES      = ["Netanya","Haifa","Beersheba","Ashdod","Rishon"];
+
+/* ============================================================
+   Normalization helpers — same logic as packages/shared/src/normalize.ts
+   ============================================================ */
+function normalizePhone(raw) {
+  let d = raw.replace(/[^\d+]/g, "");
+  if (d.startsWith("+972")) d = "0" + d.slice(4);
+  else if (d.startsWith("972")) d = "0" + d.slice(3);
+  return d.replace(/\D/g, "");
+}
+function normalizeName(raw) {
+  return raw.trim().toLowerCase().replace(/\.$/, "").replace(/\s+/g, " ");
+}
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  if (!m) return n; if (!n) return m;
+  let prev = Array.from({length:n+1}, (_,i)=>i), curr = new Array(n+1);
+  for (let i=1;i<=m;i++){
+    curr[0]=i;
+    for (let j=1;j<=n;j++){
+      const cost = a[i-1]===b[j-1] ? 0 : 1;
+      curr[j] = Math.min(curr[j-1]+1, prev[j]+1, prev[j-1]+cost);
+    }
+    [prev,curr]=[curr,prev];
+  }
+  return prev[n];
+}
+function similarityScore(a,b){
+  const na=normalizeName(a), nb=normalizeName(b);
+  if (na===nb) return 1;
+  const maxLen = Math.max(na.length, nb.length);
+  if (!maxLen) return 1;
+  return Math.max(0, 1 - levenshtein(na,nb)/maxLen);
+}
+
+/* ============================================================
+   In-memory "database" — array of people (equivalent to the
+   `people` table in packages/database). Populated by generate().
+   ============================================================ */
+let PEOPLE = [];       // { id, firstName, lastName, phone, address, city, fatherId, motherId }
+let RAW_RECORDS = [];  // per-source partial records, for the Entity Resolution demo
+
+function pad(n,w){ return String(n).padStart(w,"0"); }
+
+function generate(familyCount, seed) {
+  const rand = mulberry32(seed);
+  const pick = (arr) => arr[Math.floor(rand()*arr.length)];
+  PEOPLE = [];
+  RAW_RECORDS = [];
+  let seq = 1;
+  const nextId = () => "P" + pad(seq++, 8);
+  const phoneFor = (s) => `050-000-${pad(s % 10000, 4)}`;
+
+  for (let f = 0; f < familyCount; f++) {
+    const fatherId = nextId(), motherId = nextId();
+    const lastName = pick(LAST_NAMES);
+    const city = pick(CITIES);
+    const address = `${1+Math.floor(rand()*500)} Example Street`;
+
+    for (const id of [fatherId, motherId]) {
+      PEOPLE.push({ id, firstName: pick(FIRST_NAMES), lastName, phone: phoneFor(seq), address, city, fatherId: null, motherId: null });
+    }
+    const childCount = 2 + Math.floor(rand()*3);
+    for (let c=0; c<childCount; c++) {
+      const id = nextId();
+      const firstName = pick(FIRST_NAMES);
+      const phone = phoneFor(seq);
+      PEOPLE.push({ id, firstName, lastName, phone, address, city, fatherId, motherId });
+
+      // Intentional near-duplicate + conflict for the Entity Resolution demo (first child of first 3 families only)
+      if (f < 3 && c === 0) {
+        RAW_RECORDS.push({
+          source: "SYNTHETIC_SOURCE_01",
+          record: { person_id: id, first_name: firstName, last_name: lastName, phone }
+        });
+        const typo = firstName.length > 3 ? firstName.slice(0,-1) : firstName;
+        RAW_RECORDS.push({
+          source: "SYNTHETIC_SOURCE_03",
+          record: { person_id: id, first_name: typo, last_name: lastName[0]+".", phone: phone.replace(/-/g,"") }
+        });
+        RAW_RECORDS.push({
+          source: "SYNTHETIC_PHONE_SOURCE",
+          record: { person_id: id, first_name: firstName, last_name: lastName, phone: phoneFor(seq+9999) } // conflicting phone
+        });
+      }
+    }
+  }
+}
+
+/* ============================================================
+   RelationshipEngine (same algorithm as packages/relationships) —
+   father_id AND mother_id both match => CONFIRMED sibling;
+   only one known => POSSIBLE_RELATION, never CONFIRMED.
+   ============================================================ */
+function findById(id){ return PEOPLE.find(p=>p.id===id) || null; }
+function getParents(person){ return [person.fatherId, person.motherId].map(findById).filter(Boolean); }
+function getChildren(id){ return PEOPLE.filter(p=>p.fatherId===id || p.motherId===id); }
+function getSiblings(person){
+  if (!person) return [];
+  if (person.fatherId && person.motherId) {
+    return PEOPLE.filter(p => p.id!==person.id && p.fatherId===person.fatherId && p.motherId===person.motherId)
+      .map(p => ({ person:p, status:"CONFIRMED" }));
+  }
+  const field = person.fatherId ? "fatherId" : person.motherId ? "motherId" : null;
+  if (!field) return [];
+  return PEOPLE.filter(p => p.id!==person.id && p[field]===person[field])
+    .map(p => ({ person:p, status:"POSSIBLE_RELATION" }));
+}
+function getGrandparents(person){
+  const parents = getParents(person);
+  const out = []; const seen = new Set();
+  for (const parent of parents) for (const gp of getParents(parent)) if(!seen.has(gp.id)){ seen.add(gp.id); out.push(gp); }
+  return out;
+}
+
+/* ============================================================
+   SearchService — mirrors packages/search/src/search-service.ts
+   ============================================================ */
+function detectQueryType(q){
+  if (/^P\d{6,9}$/i.test(q.trim())) return "id";
+  const digits = (q.match(/\d/g)||[]).length;
+  if (digits>=7 && digits/q.replace(/\s/g,"").length>0.6) return "phone";
+  return "name";
+}
+function search(query, type){
+  const t = (type==="auto"||!type) ? detectQueryType(query) : type;
+  if (t==="id") { const p = findById(query.trim().toUpperCase()); return p?[{person:p}]:[]; }
+  if (t==="phone") { const n = normalizePhone(query); return PEOPLE.filter(p=>normalizePhone(p.phone)===n).map(p=>({person:p})); }
+  // fuzzy name
+  return PEOPLE
+    .map(p => ({ person:p, matchScore: similarityScore(`${p.firstName} ${p.lastName}`, query) }))
+    .filter(r => r.matchScore > 0.35)
+    .sort((a,b)=>b.matchScore-a.matchScore)
+    .slice(0,50);
+}
+
+/* ============================================================
+   EntityResolutionService — mirrors packages/entity-resolution
+   ============================================================ */
+function compareRecords(a,b){
+  const evidence = [];
+  let phoneMatch=false, nameScore=0;
+  if (a.phone && b.phone) {
+    const na=normalizePhone(a.phone), nb=normalizePhone(b.phone);
+    if (na && na===nb) { phoneMatch=true; evidence.push(`phone: ${na} (both sources)`); }
+  }
+  if (a.first_name && a.last_name && b.first_name && b.last_name) {
+    nameScore = similarityScore(`${a.first_name} ${a.last_name}`, `${b.first_name} ${b.last_name}`);
+    if (nameScore>0.5) evidence.push(`name similarity: ${(nameScore*100).toFixed(0)}%`);
+  }
+  if (a.person_id && a.person_id===b.person_id) {
+    return { matchType:"EXACT_ID", confidenceLevel:"CONFIRMED", evidence:["person_id: "+a.person_id] };
+  }
+  if (phoneMatch && nameScore>0.7) return { matchType:"MULTI_FIELD_MATCH", confidenceLevel:"HIGH", evidence };
+  if (phoneMatch) return { matchType:"EXACT_PHONE", confidenceLevel:"MEDIUM", evidence };
+  if (nameScore>0.7) return { matchType:"NAME_MATCH", confidenceLevel:"LOW", evidence };
+  return { matchType:"NAME_MATCH", confidenceLevel:"UNRESOLVED", evidence:[] };
+}
+
+/* ============================================================
+   UI wiring
+   ============================================================ */
+function renderStats(){
+  const el = document.getElementById("stats");
+  el.innerHTML = `
+    <div class="stat"><b>${PEOPLE.length}</b><span>People</span></div>
+    <div class="stat"><b>${new Set(PEOPLE.map(p=>p.fatherId||p.id)).size}</b><span>Families (approx.)</span></div>
+  `;
+}
+
+function selectPerson(person){
+  document.querySelectorAll(".tabs button").forEach(b=>b.classList.remove("active"));
+  document.querySelector('[data-tab="profile"]').classList.add("active");
+  showTab("profile");
+
+  const parents = getParents(person);
+  const siblings = getSiblings(person);
+  const grandparents = getGrandparents(person);
+
+  document.getElementById("profileContent").innerHTML = `
+    <dl>
+      <dt>Name</dt><dd>${person.firstName} ${person.lastName}</dd>
+      <dt>Synthetic ID</dt><dd>${person.id}</dd>
+      <dt>Phone</dt><dd>${person.phone}</dd>
+      <dt>Address</dt><dd>${person.address}, ${person.city}</dd>
+      <dt>Parents</dt><dd>${parents.map(p=>p.firstName).join(", ") || "—"}</dd>
+      <dt>Siblings</dt><dd>${siblings.map(s=>`${s.person.firstName} <span class="badge ${s.status==='CONFIRMED'?'high':''}">${s.status}</span>`).join(", ") || "—"}</dd>
+      <dt>Grandparents</dt><dd>${grandparents.map(p=>p.firstName).join(", ") || "—"}</dd>
+    </dl>
+  `;
+  renderGraph(person, parents, siblings);
+}
+
+function renderGraph(person, parents, siblings){
+  const children = [person, ...siblings.map(s=>s.person)];
+  const width = 120*(children.length+1);
+  let svg = `<svg viewBox="0 0 ${width} 220">`;
+  parents.forEach((parent,i)=>{
+    const x = width/2 + (i===0?-60:60);
+    svg += `<line x1="${x}" y1="40" x2="${width/2}" y2="110" stroke="#9ca3af" stroke-width="2"/>
+      <circle cx="${x}" cy="30" r="20" fill="#6366f1"/>
+      <text x="${x}" y="65" text-anchor="middle" fill="#e6e8ec" font-size="12">${parent.firstName}</text>`;
+  });
+  children.forEach((child,i)=>{
+    const x = 60+i*120;
+    const isSelf = child.id===person.id;
+    svg += `<line x1="${width/2}" y1="110" x2="${x}" y2="150" stroke="#9ca3af" stroke-width="2"/>
+      <circle cx="${x}" cy="160" r="20" fill="${isSelf?'#f59e0b':'#10b981'}"/>
+      <text x="${x}" y="195" text-anchor="middle" fill="#e6e8ec" font-size="12">${child.firstName}</text>`;
+  });
+  svg += `</svg>`;
+  document.getElementById("graphContainer").innerHTML = svg;
+}
+
+function showTab(name){
+  ["results","profile","er"].forEach(t=>{
+    document.getElementById("tab-"+t).classList.toggle("hidden", t!==name);
+  });
+}
+
+document.querySelectorAll(".tabs button").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    document.querySelectorAll(".tabs button").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    showTab(btn.dataset.tab);
+  });
+});
+
+document.getElementById("generateBtn").addEventListener("click", ()=>{
+  const familyCount = Math.max(1, Math.min(2000, Number(document.getElementById("familyCount").value)||40));
+  const seed = Number(document.getElementById("seed").value)||42;
+  generate(familyCount, seed);
+  renderStats();
+  document.getElementById("resultsList").innerHTML = `<p style="color:var(--ok)">✓ Generated ${PEOPLE.length} synthetic people across ${familyCount} families.</p>`;
+});
+
+document.getElementById("searchBtn").addEventListener("click", ()=>{
+  const q = document.getElementById("searchQuery").value.trim();
+  const type = document.getElementById("searchType").value;
+  document.querySelectorAll(".tabs button").forEach(b=>b.classList.remove("active"));
+  document.querySelector('[data-tab="results"]').classList.add("active");
+  showTab("results");
+
+  if (!PEOPLE.length) {
+    document.getElementById("resultsList").innerHTML = `<p style="color:var(--danger)">קודם לחץ Generate.</p>`;
+    return;
+  }
+  if (!q) return;
+  const results = search(q, type);
+  const list = document.getElementById("resultsList");
+  if (!results.length) { list.innerHTML = `<p style="color:var(--muted)">No results.</p>`; return; }
+  list.innerHTML = results.map(r => `
+    <div class="result-item" data-id="${r.person.id}">
+      <div>
+        <strong>${r.person.firstName} ${r.person.lastName}</strong>
+        <div style="font-size:12px;color:var(--muted)">${r.person.id} · ${r.person.phone}</div>
+      </div>
+      ${r.matchScore!==undefined ? `<span class="badge">${Math.round(r.matchScore*100)}%</span>` : ""}
+    </div>
+  `).join("");
+  list.querySelectorAll(".result-item").forEach(el=>{
+    el.addEventListener("click", ()=> selectPerson(findById(el.dataset.id)));
+  });
+});
+
+document.getElementById("erDemoBtn").addEventListener("click", ()=>{
+  document.querySelectorAll(".tabs button").forEach(b=>b.classList.remove("active"));
+  document.querySelector('[data-tab="er"]').classList.add("active");
+  showTab("er");
+
+  if (RAW_RECORDS.length < 3) {
+    document.getElementById("erContent").innerHTML = `<p style="color:var(--danger)">קודם לחץ Generate (עם לפחות 3 משפחות).</p>`;
+    return;
+  }
+  const [a,b,c] = RAW_RECORDS.slice(0,3);
+  const matchAB = compareRecords(a.record, b.record);
+  const conflict = a.record.phone !== c.record.phone;
+
+  document.getElementById("erContent").innerHTML = `
+    <h3 style="font-size:13px;color:var(--muted)">Comparing records for the same synthetic person, from two different sources:</h3>
+    <dl>
+      <dt>${a.source}</dt><dd>${a.record.first_name} ${a.record.last_name} · ${a.record.phone}</dd>
+      <dt>${b.source}</dt><dd>${b.record.first_name} ${b.record.last_name} · ${b.record.phone}</dd>
+    </dl>
+    <p style="margin:14px 0 4px">Match: <span class="badge ${matchAB.confidenceLevel==='HIGH'?'high':''}">${matchAB.matchType} / ${matchAB.confidenceLevel}</span></p>
+    <ul style="font-size:13px;color:var(--muted)">${matchAB.evidence.map(e=>`<li>${e}</li>`).join("")}</ul>
+
+    <h3 style="font-size:13px;color:var(--muted);margin-top:16px">Conflict Detection — phone number across sources:</h3>
+    <dl>
+      <dt>${a.source}</dt><dd>${a.record.phone}</dd>
+      <dt>${c.source}</dt><dd>${c.record.phone}</dd>
+    </dl>
+    <p><span class="badge ${conflict?'conflict':''}">${conflict ? "CONFLICT DETECTED" : "No conflict"}</span> — nothing is deleted, both values are kept.</p>
+  `;
+});
+</script>
+</body>
+</html>
